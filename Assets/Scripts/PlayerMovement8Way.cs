@@ -27,7 +27,7 @@ public class PlayerMovement8Way : MonoBehaviour
         Animator.StringToHash("MoveY");
 
     private static readonly int IsMoving =
-        Animator.StringToHash("IsMoving");
+        Animator.StringToHash("isMoving");
 
     private void Awake()
     {
