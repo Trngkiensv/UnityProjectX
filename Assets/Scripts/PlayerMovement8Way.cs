@@ -10,52 +10,40 @@ public class PlayerMovement8Way : MonoBehaviour
     [Header("Gravity")]
     [SerializeField] private float gravity = -20f;
 
+    [Header("Animation")]
+    [SerializeField] private Animator animator;
+
     private CharacterController controller;
 
     private Vector2 moveInput;
+    private Vector2 lastFacingDirection = Vector2.down;
+
     private float verticalVelocity;
 
-    public Vector2 LastMoveDirection { get; private set; } = Vector2.down;
+    private static readonly int MoveX =
+        Animator.StringToHash("MoveX");
+
+    private static readonly int MoveY =
+        Animator.StringToHash("MoveY");
+
+    private static readonly int IsMoving =
+        Animator.StringToHash("IsMoving");
 
     private void Awake()
     {
         controller = GetComponent<CharacterController>();
+
+        if (animator == null)
+        {
+            animator = GetComponentInChildren<Animator>();
+        }
     }
 
     private void Update()
     {
         ReadInput();
-
-        Vector3 moveDirection = new Vector3(
-            moveInput.x,
-            0f,
-            moveInput.y
-        );
-
-        moveDirection = Vector3.ClampMagnitude(moveDirection, 1f);
-
-        if (moveInput.sqrMagnitude > 0.01f)
-        {
-            LastMoveDirection = moveInput.normalized;
-        }
-
-        if (controller.isGrounded && verticalVelocity < 0f)
-        {
-            verticalVelocity = -2f;
-        }
-        else
-        {
-            verticalVelocity += gravity * Time.deltaTime;
-        }
-
-        Vector3 velocity =
-            moveDirection * moveSpeed;
-
-        velocity.y = verticalVelocity;
-
-        controller.Move(
-            velocity * Time.deltaTime
-        );
+        MovePlayer();
+        UpdateAnimation();
     }
 
     private void ReadInput()
@@ -77,21 +65,18 @@ public class PlayerMovement8Way : MonoBehaviour
             x -= 1f;
         }
 
-        // RIGHT
         if (keyboard.dKey.isPressed ||
             keyboard.rightArrowKey.isPressed)
         {
             x += 1f;
         }
 
-        // DOWN
         if (keyboard.sKey.isPressed ||
             keyboard.downArrowKey.isPressed)
         {
             y -= 1f;
         }
 
-        // UP
         if (keyboard.wKey.isPressed ||
             keyboard.upArrowKey.isPressed)
         {
@@ -104,5 +89,75 @@ public class PlayerMovement8Way : MonoBehaviour
         {
             moveInput.Normalize();
         }
+    }
+
+    private void MovePlayer()
+    {
+        Vector3 moveDirection = new Vector3(
+            moveInput.x,
+            0f,
+            moveInput.y
+        );
+
+        if (controller.isGrounded &&
+            verticalVelocity < 0f)
+        {
+            verticalVelocity = -2f;
+        }
+        else
+        {
+            verticalVelocity += gravity * Time.deltaTime;
+        }
+
+        Vector3 velocity =
+            moveDirection * moveSpeed;
+
+        velocity.y = verticalVelocity;
+
+        controller.Move(
+            velocity * Time.deltaTime
+        );
+    }
+
+    private void UpdateAnimation()
+    {
+        bool isMoving =
+            moveInput.sqrMagnitude > 0.01f;
+
+        if (isMoving)
+        {
+            // Horizontal animation has priority during diagonal movement.
+            if (Mathf.Abs(moveInput.x) > 0.01f)
+            {
+                lastFacingDirection =
+                    new Vector2(
+                        Mathf.Sign(moveInput.x),
+                        0f
+                    );
+            }
+            else
+            {
+                lastFacingDirection =
+                    new Vector2(
+                        0f,
+                        Mathf.Sign(moveInput.y)
+                    );
+            }
+        }
+
+        animator.SetFloat(
+            MoveX,
+            lastFacingDirection.x
+        );
+
+        animator.SetFloat(
+            MoveY,
+            lastFacingDirection.y
+        );
+
+        animator.SetBool(
+            IsMoving,
+            isMoving
+        );
     }
 }
