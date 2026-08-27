@@ -8,22 +8,27 @@ public class PuzzleCell :
 {
     [SerializeField] private Image image;
 
-    public bool IsOccupied { get; private set; }
-
     public int GridX { get; private set; }
     public int GridY { get; private set; }
 
+    public RectTransform RectTransform
+    {
+        get;
+        private set;
+    }
+
     private PuzzleBoard board;
-    private Color emptyColor;
 
     private void Awake()
     {
+        RectTransform =
+            GetComponent<RectTransform>();
+
         if (image == null)
         {
-            image = GetComponent<Image>();
+            image =
+                GetComponent<Image>();
         }
-
-        emptyColor = image.color;
     }
 
     public void Initialize(
@@ -44,7 +49,9 @@ public class PuzzleCell :
             eventData.pointerDrag?
                 .GetComponent<PuzzlePiece>();
 
-        if (piece == null || board == null)
+        if (
+            piece == null ||
+            board == null)
         {
             return;
         }
@@ -54,17 +61,5 @@ public class PuzzleCell :
             GridX,
             GridY
         );
-    }
-
-    public void Fill(Color color)
-    {
-        IsOccupied = true;
-        image.color = color;
-    }
-
-    public void Clear()
-    {
-        IsOccupied = false;
-        image.color = emptyColor;
     }
 }

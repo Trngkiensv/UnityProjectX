@@ -1,18 +1,20 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
 
 public class PuzzlePieceDrag :
     MonoBehaviour,
     IBeginDragHandler,
     IDragHandler,
-    IEndDragHandler
+    IEndDragHandler,
+    IPointerClickHandler
 {
     private RectTransform rectTransform;
     private Canvas canvas;
     private CanvasGroup canvasGroup;
     private PuzzlePiece piece;
 
-    private Vector2 startPosition;
+    private bool isDragging;
 
     private void Awake()
     {
@@ -35,13 +37,35 @@ public class PuzzlePieceDrag :
         }
     }
 
+    private void Update()
+    {
+        if (
+            !isDragging ||
+            Keyboard.current == null)
+        {
+            return;
+        }
+
+        if (
+            Keyboard.current
+                .rKey
+                .wasPressedThisFrame)
+        {
+            piece.RotateClockwise();
+        }
+    }
+
     public void OnBeginDrag(
         PointerEventData eventData)
     {
-        startPosition =
-            rectTransform.anchoredPosition;
+        isDragging = true;
 
-        canvasGroup.blocksRaycasts = false;
+        piece.BeginDrag();
+
+        canvasGroup.blocksRaycasts =
+            false;
+
+        canvasGroup.alpha = 0.9f;
     }
 
     public void OnDrag(
@@ -55,16 +79,32 @@ public class PuzzlePieceDrag :
     public void OnEndDrag(
         PointerEventData eventData)
     {
-        canvasGroup.blocksRaycasts = true;
+        isDragging = false;
 
-        if (piece != null &&
-            piece.IsPlaced)
+        canvasGroup.blocksRaycasts =
+            true;
+
+        canvasGroup.alpha = 1f;
+
+        if (!piece.DropSucceededThisDrag)
         {
-            gameObject.SetActive(false);
+            piece.RestoreAfterFailedDrag();
+        }
+    }
+
+    public void OnPointerClick(
+        PointerEventData eventData)
+    {
+        if (isDragging)
+        {
             return;
         }
 
-        rectTransform.anchoredPosition =
-            startPosition;
+        if (
+            eventData.button ==
+            PointerEventData.InputButton.Right)
+        {
+            piece.RotateClockwise();
+        }
     }
 }

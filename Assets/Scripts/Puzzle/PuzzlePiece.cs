@@ -2,53 +2,129 @@
 using UnityEngine;
 using UnityEngine.UI;
 
-public enum PuzzleShape
-{
-    Single,
-    Line3,
-    Square2x2,
-    L4,
-    T4,
-    Z4
-}
-
 [RequireComponent(typeof(RectTransform))]
 public class PuzzlePiece : MonoBehaviour
 {
-    [SerializeField] private PuzzleShape shapeType = PuzzleShape.Line3;
-
     [Header("Visual")]
     [SerializeField] private float blockSize = 70f;
     [SerializeField] private float spacing = 6f;
-    [SerializeField]
-    private Color blockColor =
-        new Color(1f, 0.65f, 0f, 1f);
-    [SerializeField] private Sprite blockSprite;
-
-    public IReadOnlyList<Vector2Int> Cells => cells;
-    public Color BlockColor => blockColor;
-    public bool IsPlaced { get; private set; }
 
     private readonly List<Vector2Int> cells =
         new List<Vector2Int>();
 
     private RectTransform rectTransform;
+    private LayoutElement layoutElement;
+
+    private Color blockColor;
+    private Sprite blockSprite;
+
+    private RectTransform homeParent;
+    private int homeSiblingIndex;
+
+    private PuzzleBoard currentBoard;
+    private int anchorX;
+    private int anchorY;
+
+    private PuzzleBoard previousBoard;
+    private int previousAnchorX;
+    private int previousAnchorY;
+
+    public IReadOnlyList<Vector2Int> Cells => cells;
+    public Color BlockColor => blockColor;
+
+    public bool IsPlaced { get; private set; }
+    public bool DropSucceededThisDrag { get; private set; }
+
+    public PuzzleBoard CurrentBoard => currentBoard;
+    public int AnchorX => anchorX;
+    public int AnchorY => anchorY;
 
     private void Awake()
     {
-        rectTransform = GetComponent<RectTransform>();
-        Build();
+        rectTransform =
+            GetComponent<RectTransform>();
+
+        layoutElement =
+            GetComponent<LayoutElement>();
+
+        if (layoutElement == null)
+        {
+            layoutElement =
+                gameObject.AddComponent<LayoutElement>();
+        }
     }
 
-    private void Build()
+    public void Initialize(
+        Vector2Int[] shapeCells,
+        Color color,
+        Sprite sprite,
+        RectTransform trayParent)
+    {
+        blockColor = color;
+        blockSprite = sprite;
+
+        homeParent = trayParent;
+        homeSiblingIndex =
+            transform.GetSiblingIndex();
+
+        SetCells(shapeCells);
+
+        layoutElement.ignoreLayout = false;
+    }
+
+    public void SetCells(
+        IEnumerable<Vector2Int> newCells)
     {
         cells.Clear();
 
-        Vector2Int[] shape = GetShape(shapeType);
-
-        foreach (Vector2Int cell in shape)
+        foreach (Vector2Int cell in newCells)
         {
             cells.Add(cell);
+        }
+
+        NormalizeCells();
+        BuildVisual();
+    }
+
+    private void NormalizeCells()
+    {
+        if (cells.Count == 0)
+        {
+            cells.Add(Vector2Int.zero);
+            return;
+        }
+
+        int minX = int.MaxValue;
+        int minY = int.MaxValue;
+
+        foreach (Vector2Int cell in cells)
+        {
+            minX = Mathf.Min(minX, cell.x);
+            minY = Mathf.Min(minY, cell.y);
+        }
+
+        for (int i = 0; i < cells.Count; i++)
+        {
+            cells[i] =
+                new Vector2Int(
+                    cells[i].x - minX,
+                    cells[i].y - minY
+                );
+        }
+    }
+
+    private void BuildVisual()
+    {
+        for (
+            int i = transform.childCount - 1;
+            i >= 0;
+            i--)
+        {
+            GameObject child =
+                transform.GetChild(i).gameObject;
+
+            child.SetActive(false);
+            Destroy(child);
         }
 
         int maxX = 0;
@@ -60,37 +136,37 @@ public class PuzzlePiece : MonoBehaviour
             maxY = Mathf.Max(maxY, cell.y);
         }
 
-        float step = blockSize + spacing;
+        float step =
+            blockSize + spacing;
 
         float width =
-            (maxX + 1) * blockSize +
-            maxX * spacing;
+            blockSize +
+            maxX * step;
 
         float height =
-            (maxY + 1) * blockSize +
-            maxY * spacing;
+            blockSize +
+            maxY * step;
+
+        rectTransform.pivot =
+            new Vector2(0f, 1f);
 
         rectTransform.sizeDelta =
             new Vector2(width, height);
 
+        layoutElement.preferredWidth = width;
+        layoutElement.preferredHeight = height;
+
         foreach (Vector2Int cell in cells)
         {
-            CreateBlock(
-                cell,
-                width,
-                height,
-                step
-            );
+            CreateBlock(cell, step);
         }
     }
 
     private void CreateBlock(
         Vector2Int cell,
-        float width,
-        float height,
         float step)
     {
-        GameObject blockObject =
+        GameObject block =
             new GameObject(
                 "Block",
                 typeof(RectTransform),
@@ -99,108 +175,243 @@ public class PuzzlePiece : MonoBehaviour
             );
 
         RectTransform blockRect =
-            blockObject.GetComponent<RectTransform>();
+            block.GetComponent<RectTransform>();
 
-        blockRect.SetParent(transform, false);
+        blockRect.SetParent(
+            transform,
+            false
+        );
 
         blockRect.anchorMin =
-            new Vector2(0.5f, 0.5f);
+            new Vector2(0f, 1f);
 
         blockRect.anchorMax =
-            new Vector2(0.5f, 0.5f);
+            new Vector2(0f, 1f);
 
         blockRect.pivot =
             new Vector2(0.5f, 0.5f);
 
         blockRect.sizeDelta =
-            new Vector2(blockSize, blockSize);
-
-        float x =
-            -width * 0.5f +
-            blockSize * 0.5f +
-            cell.x * step;
-
-        float y =
-            height * 0.5f -
-            blockSize * 0.5f -
-            cell.y * step;
+            new Vector2(
+                blockSize,
+                blockSize
+            );
 
         blockRect.anchoredPosition =
-            new Vector2(x, y);
+            new Vector2(
+                blockSize * 0.5f +
+                cell.x * step,
+
+                -blockSize * 0.5f -
+                cell.y * step
+            );
 
         Image image =
-            blockObject.GetComponent<Image>();
+            block.GetComponent<Image>();
 
         image.color = blockColor;
         image.sprite = blockSprite;
         image.raycastTarget = true;
     }
 
-    public void MarkPlaced()
+    public void BeginDrag()
     {
-        IsPlaced = true;
+        DropSucceededThisDrag = false;
+
+        previousBoard = null;
+
+        if (
+            IsPlaced &&
+            currentBoard != null)
+        {
+            previousBoard =
+                currentBoard;
+
+            previousAnchorX =
+                anchorX;
+
+            previousAnchorY =
+                anchorY;
+
+            currentBoard.RemovePiece(this);
+
+            currentBoard = null;
+            IsPlaced = false;
+        }
+
+        layoutElement.ignoreLayout = true;
     }
 
-    private static Vector2Int[] GetShape(
-        PuzzleShape shape)
+    public void CommitPlacement(
+        PuzzleBoard board,
+        int x,
+        int y,
+        RectTransform placedLayer,
+        PuzzleCell anchorCell,
+        bool markDropSuccess)
     {
-        switch (shape)
+        currentBoard = board;
+
+        anchorX = x;
+        anchorY = y;
+
+        IsPlaced = true;
+
+        DropSucceededThisDrag =
+            markDropSuccess;
+
+        previousBoard = null;
+
+        layoutElement.ignoreLayout = true;
+
+        rectTransform.SetParent(
+            placedLayer,
+            true
+        );
+
+        SnapToCell(anchorCell);
+    }
+
+    private void SnapToCell(
+        PuzzleCell cell)
+    {
+        Vector3[] corners =
+            new Vector3[4];
+
+        cell.RectTransform.GetWorldCorners(
+            corners
+        );
+
+        rectTransform.position =
+            corners[1];
+
+        rectTransform.localScale =
+            Vector3.one;
+
+        rectTransform.localRotation =
+            Quaternion.identity;
+    }
+
+    public void RestoreAfterFailedDrag()
+    {
+        if (previousBoard != null)
         {
-            case PuzzleShape.Single:
-                return new[]
-                {
-                    new Vector2Int(0, 0)
-                };
+            PuzzleBoard board =
+                previousBoard;
 
-            case PuzzleShape.Line3:
-                return new[]
-                {
-                    new Vector2Int(0, 0),
-                    new Vector2Int(1, 0),
-                    new Vector2Int(2, 0)
-                };
+            int x =
+                previousAnchorX;
 
-            case PuzzleShape.Square2x2:
-                return new[]
-                {
-                    new Vector2Int(0, 0),
-                    new Vector2Int(1, 0),
-                    new Vector2Int(0, 1),
-                    new Vector2Int(1, 1)
-                };
+            int y =
+                previousAnchorY;
 
-            case PuzzleShape.L4:
-                return new[]
-                {
-                    new Vector2Int(0, 0),
-                    new Vector2Int(0, 1),
-                    new Vector2Int(0, 2),
-                    new Vector2Int(1, 2)
-                };
+            previousBoard = null;
 
-            case PuzzleShape.T4:
-                return new[]
-                {
-                    new Vector2Int(0, 0),
-                    new Vector2Int(1, 0),
-                    new Vector2Int(2, 0),
-                    new Vector2Int(1, 1)
-                };
+            if (!board.TryPlacePiece(
+                    this,
+                    x,
+                    y,
+                    false))
+            {
+                ReturnHome();
+            }
 
-            case PuzzleShape.Z4:
-                return new[]
-                {
-                    new Vector2Int(0, 0),
-                    new Vector2Int(1, 0),
-                    new Vector2Int(1, 1),
-                    new Vector2Int(2, 1)
-                };
-
-            default:
-                return new[]
-                {
-                    new Vector2Int(0, 0)
-                };
+            return;
         }
+
+        ReturnHome();
+    }
+
+    public void ReturnHome()
+    {
+        currentBoard = null;
+
+        IsPlaced = false;
+        DropSucceededThisDrag = false;
+
+        rectTransform.SetParent(
+            homeParent,
+            false
+        );
+
+        if (homeParent != null)
+        {
+            int sibling =
+                Mathf.Clamp(
+                    homeSiblingIndex,
+                    0,
+                    homeParent.childCount - 1
+                );
+
+            transform.SetSiblingIndex(
+                sibling
+            );
+        }
+
+        rectTransform.localScale =
+            Vector3.one;
+
+        rectTransform.localRotation =
+            Quaternion.identity;
+
+        layoutElement.ignoreLayout =
+            false;
+
+        if (homeParent != null)
+        {
+            LayoutRebuilder.MarkLayoutForRebuild(
+                homeParent
+            );
+        }
+    }
+
+    public void RotateClockwise()
+    {
+        if (
+            IsPlaced &&
+            currentBoard != null)
+        {
+            currentBoard.TryRotatePiece(
+                this
+            );
+
+            return;
+        }
+
+        ApplyRotationClockwise();
+    }
+
+    public void ApplyRotationClockwise()
+    {
+        int maxY = 0;
+
+        foreach (Vector2Int cell in cells)
+        {
+            maxY =
+                Mathf.Max(
+                    maxY,
+                    cell.y
+                );
+        }
+
+        List<Vector2Int> rotated =
+            new List<Vector2Int>();
+
+        foreach (Vector2Int cell in cells)
+        {
+            rotated.Add(
+                new Vector2Int(
+                    maxY - cell.y,
+                    cell.x
+                )
+            );
+        }
+
+        SetCells(rotated);
+    }
+
+    public Vector2Int[] GetCellsCopy()
+    {
+        return cells.ToArray();
     }
 }
