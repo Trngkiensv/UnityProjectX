@@ -24,8 +24,53 @@ public class PuzzleBoard : MonoBehaviour
                 PuzzleCell cell =
                     Instantiate(cellPrefab, transform);
 
+                cell.Initialize(this, x, y);
+
                 cells[x, y] = cell;
             }
         }
+    }
+
+    public bool TryPlacePiece(
+        PuzzlePiece piece,
+        int anchorX,
+        int anchorY)
+    {
+        foreach (Vector2Int offset in piece.Cells)
+        {
+            int x = anchorX + offset.x;
+            int y = anchorY + offset.y;
+
+            if (!IsInsideBoard(x, y))
+            {
+                return false;
+            }
+
+            if (cells[x, y].IsOccupied)
+            {
+                return false;
+            }
+        }
+
+        foreach (Vector2Int offset in piece.Cells)
+        {
+            int x = anchorX + offset.x;
+            int y = anchorY + offset.y;
+
+            cells[x, y].Fill(piece.BlockColor);
+        }
+
+        piece.MarkPlaced();
+
+        return true;
+    }
+
+    private bool IsInsideBoard(int x, int y)
+    {
+        return
+            x >= 0 &&
+            x < width &&
+            y >= 0 &&
+            y < height;
     }
 }

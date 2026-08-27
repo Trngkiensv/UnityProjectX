@@ -10,9 +10,11 @@ public class PuzzleCell :
 
     public bool IsOccupied { get; private set; }
 
+    public int GridX { get; private set; }
+    public int GridY { get; private set; }
+
+    private PuzzleBoard board;
     private Color emptyColor;
-    private Color filledColor =
-        new Color(0.75f, 0.45f, 0.2f, 1f);
 
     private void Awake()
     {
@@ -24,31 +26,40 @@ public class PuzzleCell :
         emptyColor = image.color;
     }
 
-    public void OnDrop(PointerEventData eventData)
+    public void Initialize(
+        PuzzleBoard puzzleBoard,
+        int x,
+        int y)
     {
-        if (IsOccupied)
-        {
-            return;
-        }
+        board = puzzleBoard;
 
-        PuzzlePieceDrag piece =
-            eventData.pointerDrag?
-                .GetComponent<PuzzlePieceDrag>();
-
-        if (piece == null)
-        {
-            return;
-        }
-
-        Fill();
-
-        piece.gameObject.SetActive(false);
+        GridX = x;
+        GridY = y;
     }
 
-    public void Fill()
+    public void OnDrop(
+        PointerEventData eventData)
+    {
+        PuzzlePiece piece =
+            eventData.pointerDrag?
+                .GetComponent<PuzzlePiece>();
+
+        if (piece == null || board == null)
+        {
+            return;
+        }
+
+        board.TryPlacePiece(
+            piece,
+            GridX,
+            GridY
+        );
+    }
+
+    public void Fill(Color color)
     {
         IsOccupied = true;
-        image.color = filledColor;
+        image.color = color;
     }
 
     public void Clear()
